@@ -538,6 +538,19 @@ async function startHttp() {
   const httpServer = createServer(async (req, res) => {
     const url = new URL(req.url || "/", `http://localhost:${PORT}`);
 
+    // CORS headers for all responses
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Accept, Mcp-Session-Id");
+    res.setHeader("Access-Control-Expose-Headers", "Mcp-Session-Id");
+
+    // Handle CORS preflight
+    if (req.method === "OPTIONS") {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+
     // Health check
     if (url.pathname === "/health") {
       res.writeHead(200, { "Content-Type": "application/json" });
@@ -545,9 +558,40 @@ async function startHttp() {
       return;
     }
 
-    // MCP endpoint
+    // Server card for Smithery scanning
+    if (url.pathname === "/.well-known/mcp/server-card.json") {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({
+        serverInfo: {
+          name: "clirank",
+          version: "0.2.0",
+        },
+        authentication: { required: false },
+        tools: [
+          { name: "discover_apis", description: "Search for APIs by intent or capability", inputSchema: { type: "object", properties: { query: { type: "string" }, min_cli_score: { type: "number" }, pricing: { type: "string" }, limit: { type: "number" } }, required: ["query"] } },
+          { name: "get_api_details", description: "Get full details for a specific API by slug", inputSchema: { type: "object", properties: { slug: { type: "string" } }, required: ["slug"] } },
+          { name: "get_api_docs", description: "Get agent-friendly documentation for an API", inputSchema: { type: "object", properties: { slug: { type: "string" } }, required: ["slug"] } },
+          { name: "compare_apis", description: "Compare two or more APIs side by side", inputSchema: { type: "object", properties: { slugs: { type: "array", items: { type: "string" } } }, required: ["slugs"] } },
+          { name: "browse_categories", description: "List all API categories", inputSchema: { type: "object", properties: {} } },
+          { name: "get_reviews", description: "Get integration reports and reviews for an API", inputSchema: { type: "object", properties: { slug: { type: "string" }, limit: { type: "number" } }, required: ["slug"] } },
+        ],
+        resources: [],
+        prompts: [],
+      }));
+      return;
+    }
+
+    // MCP endpoint - all methods handled by transport
     if (url.pathname === "/mcp") {
-      await transport.handleRequest(req, res);
+      try {
+        await transport.handleRequest(req, res);
+      } catch (err) {
+        console.error("MCP request error:", err);
+        if (!res.headersSent) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "internal_error", message: String(err) }));
+        }
+      }
       return;
     }
 

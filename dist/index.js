@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
+import { createServer } from "node:http";
 // ---------- Config ----------
 const BASE_URL = process.env.CLIRANK_API_URL || "https://clirank.dev/api";
 // ---------- HTTP helpers ----------
@@ -378,9 +380,91 @@ function formatKey(key) {
         .trim();
 }
 // ---------- Start ----------
-async function main() {
+const MODE = process.env.MCP_TRANSPORT || "stdio";
+const PORT = parseInt(process.env.PORT || "8080", 10);
+async function startStdio() {
     const transport = new StdioServerTransport();
     await server.connect(transport);
+}
+async function startHttp() {
+    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+    await server.connect(transport);
+    const httpServer = createServer(async (req, res) => {
+        const url = new URL(req.url || "/", `http://localhost:${PORT}`);
+        // CORS headers for all responses
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
+        res.setHeader("Access-Control-Allow-Headers", "Content-Type, Accept, Mcp-Session-Id");
+        res.setHeader("Access-Control-Expose-Headers", "Mcp-Session-Id");
+        // Handle CORS preflight
+        if (req.method === "OPTIONS") {
+            res.writeHead(204);
+            res.end();
+            return;
+        }
+        // Health check
+        if (url.pathname === "/health") {
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ status: "ok" }));
+            return;
+        }
+        // Server card for Smithery scanning
+        if (url.pathname === "/.well-known/mcp/server-card.json") {
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({
+                serverInfo: {
+                    name: "clirank",
+                    version: "0.2.0",
+                },
+                authentication: { required: false },
+                tools: [
+                    { name: "discover_apis", description: "Search for APIs by intent or capability", inputSchema: { type: "object", properties: { query: { type: "string" }, min_cli_score: { type: "number" }, pricing: { type: "string" }, limit: { type: "number" } }, required: ["query"] } },
+                    { name: "get_api_details", description: "Get full details for a specific API by slug", inputSchema: { type: "object", properties: { slug: { type: "string" } }, required: ["slug"] } },
+                    { name: "get_api_docs", description: "Get agent-friendly documentation for an API", inputSchema: { type: "object", properties: { slug: { type: "string" } }, required: ["slug"] } },
+                    { name: "compare_apis", description: "Compare two or more APIs side by side", inputSchema: { type: "object", properties: { slugs: { type: "array", items: { type: "string" } } }, required: ["slugs"] } },
+                    { name: "browse_categories", description: "List all API categories", inputSchema: { type: "object", properties: {} } },
+                    { name: "get_reviews", description: "Get integration reports and reviews for an API", inputSchema: { type: "object", properties: { slug: { type: "string" }, limit: { type: "number" } }, required: ["slug"] } },
+                ],
+                resources: [],
+                prompts: [],
+            }));
+            return;
+        }
+        // MCP endpoint - all methods handled by transport
+        if (url.pathname === "/mcp") {
+            try {
+                await transport.handleRequest(req, res);
+            }
+            catch (err) {
+                console.error("MCP request error:", err);
+                if (!res.headersSent) {
+                    res.writeHead(500, { "Content-Type": "application/json" });
+                    res.end(JSON.stringify({ error: "internal_error", message: String(err) }));
+                }
+            }
+            return;
+        }
+        // Redirect root to website
+        if (url.pathname === "/") {
+            res.writeHead(302, { Location: "https://clirank.dev" });
+            res.end();
+            return;
+        }
+        res.writeHead(404);
+        res.end("Not found");
+    });
+    httpServer.listen(PORT, () => {
+        console.log(`CLIRank MCP server (HTTP) listening on port ${PORT}`);
+        console.log(`MCP endpoint: http://localhost:${PORT}/mcp`);
+    });
+}
+async function main() {
+    if (MODE === "http") {
+        await startHttp();
+    }
+    else {
+        await startStdio();
+    }
 }
 main().catch((err) => {
     console.error("Fatal error:", err);
