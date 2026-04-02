@@ -2,7 +2,9 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
+import { createServer } from "node:http";
 
 // ---------- Config ----------
 
@@ -521,9 +523,57 @@ function formatKey(key: string): string {
 
 // ---------- Start ----------
 
-async function main() {
+const MODE = process.env.MCP_TRANSPORT || "stdio";
+const PORT = parseInt(process.env.PORT || "8080", 10);
+
+async function startStdio() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
+}
+
+async function startHttp() {
+  const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+  await server.connect(transport);
+
+  const httpServer = createServer(async (req, res) => {
+    const url = new URL(req.url || "/", `http://localhost:${PORT}`);
+
+    // Health check
+    if (url.pathname === "/health") {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ status: "ok" }));
+      return;
+    }
+
+    // MCP endpoint
+    if (url.pathname === "/mcp") {
+      await transport.handleRequest(req, res);
+      return;
+    }
+
+    // Redirect root to website
+    if (url.pathname === "/") {
+      res.writeHead(302, { Location: "https://clirank.dev" });
+      res.end();
+      return;
+    }
+
+    res.writeHead(404);
+    res.end("Not found");
+  });
+
+  httpServer.listen(PORT, () => {
+    console.log(`CLIRank MCP server (HTTP) listening on port ${PORT}`);
+    console.log(`MCP endpoint: http://localhost:${PORT}/mcp`);
+  });
+}
+
+async function main() {
+  if (MODE === "http") {
+    await startHttp();
+  } else {
+    await startStdio();
+  }
 }
 
 main().catch((err) => {
