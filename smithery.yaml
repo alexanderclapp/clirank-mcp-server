@@ -1,0 +1,20 @@
+# Smithery configuration file: https://smithery.ai/docs/config#smitheryyaml
+startCommand:
+  type: stdio
+  configSchema:
+    type: object
+    properties:
+      CLIRANK_API_URL:
+        type: string
+        default: "https://clirank.dev/api"
+        description: "Base URL for the CLIRank API"
+    required: []
+  commandFunction:
+    |-
+    (config) => ({
+      command: "node",
+      args: ["dist/index.js"],
+      env: {
+        CLIRANK_API_URL: config.CLIRANK_API_URL ?? "https://clirank.dev/api"
+      }
+    })
