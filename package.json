@@ -1,0 +1,30 @@
+{
+  "name": "clirank-mcp-server",
+  "version": "0.2.0",
+  "description": "CLIRank API directory as MCP tools for AI agents",
+  "type": "module",
+  "bin": {
+    "clirank-mcp-server": "./dist/index.js"
+  },
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "tsc && chmod +x dist/index.js",
+    "prepublishOnly": "npm run build",
+    "start": "node dist/index.js"
+  },
+  "keywords": ["mcp", "claude-code", "cli", "tools", "directory", "api", "clirank"],
+  "author": "CLIRank",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^3.24.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "typescript": "^5"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ]
+}
