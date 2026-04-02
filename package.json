@@ -1,6 +1,6 @@
 {
   "name": "clirank-mcp-server",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "CLIRank API directory as MCP tools for AI agents",
   "type": "module",
   "bin": {
@@ -12,9 +12,22 @@
     "prepublishOnly": "npm run build",
     "start": "node dist/index.js"
   },
-  "keywords": ["mcp", "claude-code", "cli", "tools", "directory", "api", "clirank"],
+  "mcpName": "io.github.alexanderclapp/clirank",
+  "keywords": [
+    "mcp",
+    "claude-code",
+    "cli",
+    "tools",
+    "directory",
+    "api",
+    "clirank"
+  ],
   "author": "CLIRank",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/alexanderclapp/clirank-mcp-server.git"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "zod": "^3.24.4"
