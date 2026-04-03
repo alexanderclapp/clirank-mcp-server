@@ -521,6 +521,21 @@ function formatKey(key: string): string {
     .trim();
 }
 
+// ---------- Request Counter ----------
+
+const startTime = new Date().toISOString();
+
+const requestCounts: Record<string, { total: number; uniqueUAs: Set<string>; lastSeen: string }> = {};
+
+function trackRequest(pathname: string, ua: string) {
+  if (!requestCounts[pathname]) {
+    requestCounts[pathname] = { total: 0, uniqueUAs: new Set(), lastSeen: "" };
+  }
+  requestCounts[pathname].total++;
+  requestCounts[pathname].uniqueUAs.add(ua);
+  requestCounts[pathname].lastSeen = new Date().toISOString();
+}
+
 // ---------- Start ----------
 
 const MODE = process.env.MCP_TRANSPORT || "stdio";
@@ -543,6 +558,13 @@ async function startHttp() {
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Content-Type, Accept, Mcp-Session-Id");
     res.setHeader("Access-Control-Expose-Headers", "Mcp-Session-Id");
+
+    // Log all non-health requests
+    if (url.pathname !== "/health") {
+      const ua = req.headers["user-agent"] || "unknown";
+      const ts = new Date().toISOString();
+      console.log(`[${ts}] ${req.method} ${url.pathname} ua=${ua.slice(0, 80)}`);
+    }
 
     // Handle CORS preflight
     if (req.method === "OPTIONS") {
@@ -581,8 +603,23 @@ async function startHttp() {
       return;
     }
 
+    // Stats endpoint - see who's using the MCP server
+    if (url.pathname === "/stats") {
+      const stats = Object.entries(requestCounts).map(([path, data]) => ({
+        path,
+        totalRequests: data.total,
+        uniqueClients: data.uniqueUAs.size,
+        lastSeen: data.lastSeen,
+      }));
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ upSince: startTime, stats }));
+      return;
+    }
+
     // MCP endpoint - all methods handled by transport
     if (url.pathname === "/mcp") {
+      const ua = req.headers["user-agent"] || "unknown";
+      trackRequest("/mcp", ua);
       try {
         await transport.handleRequest(req, res);
       } catch (err) {
