@@ -19,7 +19,7 @@ async function apiGet<T>(path: string, params: Record<string, string> = {}): Pro
   }
 
   const res = await fetch(url.toString(), {
-    headers: { "User-Agent": "clirank-mcp/0.2.0" },
+    headers: { "User-Agent": "clirank-mcp/0.4.0" },
   });
 
   if (!res.ok) {
@@ -56,6 +56,16 @@ interface DiscoverResult {
   matchSource: string;
   reviewMentions: number;
   agentDocs: { hasQuickstart: boolean; endpointCount: number; avgConfidence: number };
+  decisionData?: {
+    costAt10k: number;
+    costAt50k: number;
+    costAt100k: number;
+    timeToFirstRequest: number;
+    linesOfCode: number;
+    freeRequestsPerMonth: number;
+    requiresCreditCard: boolean;
+    bestFor: string[];
+  };
   detailUrl: string;
 }
 
@@ -63,6 +73,7 @@ interface DiscoverResponse {
   query: string;
   count: number;
   results: DiscoverResult[];
+  hint?: string;
 }
 
 interface ApiRecord {
@@ -110,6 +121,30 @@ interface DocsResponse {
   totalEndpoints: number;
 }
 
+interface PackageResponse {
+  name: string;
+  registry: string;
+  latestVersion: string | null;
+  versions: string[];
+  engines: Record<string, string> | null;
+  pythonRequires: string | null;
+  dependencies: Record<string, string>;
+  peerDependencies: Record<string, string>;
+  lastPublishDate: string | null;
+  weeklyDownloads: number | null;
+  monthlyDownloads: number | null;
+  license: string | null;
+  repositoryUrl: string | null;
+  homepageUrl: string | null;
+  deprecated: string | null;
+  description: string | null;
+  keywords: string[];
+  typescriptTypes: string | null;
+  cachedAt: string;
+  clirankApiSlug: string | null;
+  freshness: string;
+}
+
 interface ReviewsResponse {
   target: { type: string; slug: string };
   stats: Record<string, unknown>;
@@ -118,17 +153,75 @@ interface ReviewsResponse {
   reviews: Array<Record<string, unknown>>;
 }
 
+interface RecommendResponse {
+  task: string;
+  volume: number;
+  budget: number | null;
+  priority: string;
+  constraints: string[];
+  recommendation: {
+    name: string;
+    slug: string;
+    url: string;
+    score: number;
+    reasoning: string[];
+    monthlyCost: number;
+    bestFor: string[];
+    notGreatFor: string[];
+    setup: {
+      timeToFirstRequest: number;
+      linesOfCode: number;
+      requiresDomainVerification: boolean;
+      requiresCreditCard: boolean;
+    };
+    pricing: {
+      freeRequestsPerMonth: number;
+      costAt10k: number;
+      costAt50k: number;
+      costAt100k: number;
+      tiers: Array<{ name: string; monthlyEmails: number; pricePerMonth: number }>;
+    };
+    features: {
+      supportsInbound: boolean;
+      hasTemplateEngine: boolean;
+      webhookSupport: boolean;
+    };
+    quickstart: {
+      language: string;
+      code: string;
+    };
+    lastVerified: string;
+    detailUrl: string;
+  } | null;
+  runnerUp: {
+    name: string;
+    slug: string;
+    score: number;
+    reasoning: string[];
+    monthlyCost: number;
+    quickstart: { language: string; code: string };
+    detailUrl: string;
+  } | null;
+  comparison: string;
+  meta: {
+    apisEvaluated: number;
+    categoriesWithDecisionData: string[];
+    hint: string;
+  };
+  message?: string;
+}
+
 // ---------- MCP Server ----------
 
 const server = new McpServer({
   name: "clirank",
-  version: "0.2.0",
+  version: "0.4.0",
 });
 
 // Tool 1: discover_apis
 server.tool(
   "discover_apis",
-  "Search for APIs by intent or capability. Describe what you need and get ranked matches. Examples: 'send transactional emails', 'process payments', 'image generation'.",
+  "Search for APIs by what you need. Returns ranked matches with pricing and setup data when available. For an opinionated pick with working code, use the recommend tool instead. Examples: 'send transactional emails', 'process payments', 'image generation'.",
   {
     query: z.string().describe("What you need, e.g. 'send transactional emails'"),
     min_cli_score: z.number().min(1).max(10).optional().describe("Minimum CLI relevance score (1-10)"),
@@ -155,9 +248,19 @@ server.tool(
         lines.push(`CLI Score: ${r.cliRelevanceScore ?? "N/A"} | Quality: ${r.qualityScore ?? "N/A"} | Pricing: ${r.pricing}`);
         lines.push(`${r.description}`);
         if (r.capabilities.length) lines.push(`Capabilities: ${r.capabilities.join(", ")}`);
+        if (r.decisionData) {
+          lines.push(`Setup: ${r.decisionData.timeToFirstRequest} min, ${r.decisionData.linesOfCode} lines of code`);
+          lines.push(`Cost: $${r.decisionData.costAt10k}/mo (10K) | $${r.decisionData.costAt50k}/mo (50K) | $${r.decisionData.costAt100k}/mo (100K)`);
+          if (r.decisionData.freeRequestsPerMonth > 0) lines.push(`Free tier: ${r.decisionData.freeRequestsPerMonth.toLocaleString()}/mo`);
+          lines.push(`Best for: ${r.decisionData.bestFor.join(", ")}`);
+        }
         if (r.agentDocs.hasQuickstart) lines.push(`Agent docs: quickstart available, ${r.agentDocs.endpointCount} endpoints documented`);
         lines.push(`Details: ${r.detailUrl}`);
         lines.push("");
+      }
+
+      if (data.hint) {
+        lines.push(`---\nTip: ${data.hint}`);
       }
 
       return textResult(lines.join("\n"));
@@ -505,6 +608,158 @@ server.tool(
   }
 );
 
+// Tool 7: recommend
+server.tool(
+  "recommend",
+  "Get an opinionated API recommendation for a task. Returns ONE best pick with pricing, working quickstart code, setup time, and a runner-up. Better than guessing - uses verified pricing and setup data that's more current than your training data.",
+  {
+    task: z.string().describe("What you need, e.g. 'send transactional emails', 'process payments'"),
+    volume: z.number().optional().describe("Monthly volume (default 10000)"),
+    budget: z.number().optional().describe("Max monthly USD (0 = free tier only, omit for no limit)"),
+    priority: z.enum(["cost", "simplicity", "deliverability", "scale"]).optional().describe("What matters most (default: simplicity)"),
+    constraints: z.array(z.string()).optional().describe("Constraints: 'no-credit-card', 'no-domain-verification'"),
+  },
+  async ({ task, volume, budget, priority, constraints }) => {
+    try {
+      const params: Record<string, string> = { task };
+      if (volume !== undefined) params.volume = String(volume);
+      if (budget !== undefined) params.budget = String(budget);
+      if (priority) params.priority = priority;
+      if (constraints?.length) params.constraints = constraints.join(",");
+
+      const data = await apiGet<RecommendResponse>("/recommend", params);
+
+      if (!data.recommendation) {
+        return textResult(
+          `No APIs match your constraints for "${task}".\n` +
+          (data.message || "Try relaxing budget or removing constraints.")
+        );
+      }
+
+      const rec = data.recommendation;
+      const lines = [
+        `## Recommendation: ${rec.name}`,
+        "",
+        `**Why:** ${rec.reasoning.join(". ")}`,
+        "",
+        `### Pricing`,
+        `Monthly cost at ${(data.volume).toLocaleString()} emails: **$${rec.monthlyCost.toFixed(2)}**`,
+        `Free tier: ${rec.pricing.freeRequestsPerMonth.toLocaleString()} emails/mo`,
+        `At scale: $${rec.pricing.costAt10k} (10K) | $${rec.pricing.costAt50k} (50K) | $${rec.pricing.costAt100k} (100K)`,
+        "",
+        `### Setup`,
+        `Time to first request: ${rec.setup.timeToFirstRequest} min`,
+        `Lines of code: ${rec.setup.linesOfCode}`,
+        `Domain verification: ${rec.setup.requiresDomainVerification ? "Required" : "Not required"}`,
+        `Credit card: ${rec.setup.requiresCreditCard ? "Required" : "Not required"}`,
+        "",
+        `### Quickstart (${rec.quickstart.language})`,
+        "```" + rec.quickstart.language,
+        rec.quickstart.code,
+        "```",
+        "",
+        `Best for: ${rec.bestFor.join(", ")}`,
+        `Not great for: ${rec.notGreatFor.join(", ")}`,
+        "",
+        `Features: inbound ${rec.features.supportsInbound ? "yes" : "no"} | templates ${rec.features.hasTemplateEngine ? "yes" : "no"} | webhooks ${rec.features.webhookSupport ? "yes" : "no"}`,
+        `Last verified: ${rec.lastVerified}`,
+        `Details: ${rec.detailUrl}`,
+      ];
+
+      if (data.runnerUp) {
+        lines.push(
+          "",
+          `## Runner-up: ${data.runnerUp.name}`,
+          `Score: ${data.runnerUp.score} | Cost: $${data.runnerUp.monthlyCost.toFixed(2)}/mo`,
+          `Why: ${data.runnerUp.reasoning.join(". ")}`,
+          `Details: ${data.runnerUp.detailUrl}`,
+        );
+      }
+
+      if (data.comparison) {
+        lines.push("", "### Full Comparison", "```", data.comparison, "```");
+      }
+
+      return textResult(lines.join("\n"));
+    } catch (err) {
+      return errorResult(err instanceof Error ? err.message : String(err));
+    }
+  }
+);
+
+// Tool 8: get_package_info
+server.tool(
+  "get_package_info",
+  "Get current package version, compatibility, dependencies, and deprecation warnings for any npm or PyPI package. Faster and more current than checking registries manually. Auto-updates every 24h.",
+  {
+    name: z.string().describe("Package name, e.g. 'resend', '@anthropic-ai/sdk', 'openai'"),
+    registry: z.enum(["npm", "pypi"]).optional().describe("Registry to check (default: npm)"),
+  },
+  async ({ name, registry }) => {
+    try {
+      const params: Record<string, string> = { name };
+      if (registry) params.registry = registry;
+
+      const data = await apiGet<PackageResponse>("/package", params);
+
+      const lines = [
+        `## ${data.name} (${data.registry})`,
+        "",
+        `**Latest version:** ${data.latestVersion || "unknown"}`,
+      ];
+
+      if (data.deprecated) {
+        lines.push(`**DEPRECATED:** ${data.deprecated}`);
+      }
+
+      if (data.engines) {
+        const engines = Object.entries(data.engines as Record<string, string>)
+          .map(([k, v]) => `${k} ${v}`)
+          .join(", ");
+        lines.push(`**Engines:** ${engines}`);
+      }
+
+      if (data.pythonRequires) {
+        lines.push(`**Python:** ${data.pythonRequires}`);
+      }
+
+      if (data.license) lines.push(`**License:** ${data.license}`);
+      if (data.typescriptTypes) lines.push(`**TypeScript:** ${data.typescriptTypes}`);
+      if (data.weeklyDownloads) lines.push(`**Weekly downloads:** ${data.weeklyDownloads.toLocaleString()}`);
+      if (data.lastPublishDate) lines.push(`**Last published:** ${data.lastPublishDate.split("T")[0]}`);
+      if (data.description) lines.push(`**Description:** ${data.description}`);
+
+      // Dependencies
+      const deps = data.dependencies as Record<string, string> | undefined;
+      if (deps && Object.keys(deps).length > 0) {
+        const depList = Object.entries(deps).slice(0, 15);
+        lines.push("", "**Dependencies:**");
+        for (const [dep, ver] of depList) {
+          lines.push(`- ${dep}: ${ver}`);
+        }
+        if (Object.keys(deps).length > 15) {
+          lines.push(`- ... and ${Object.keys(deps).length - 15} more`);
+        }
+      }
+
+      // Recent versions
+      const versions = data.versions as string[] | undefined;
+      if (versions && versions.length > 0) {
+        lines.push("", `**Recent versions:** ${versions.slice(0, 10).join(", ")}`);
+      }
+
+      if (data.repositoryUrl) lines.push("", `**Repository:** ${data.repositoryUrl}`);
+      if (data.clirankApiSlug) lines.push(`**CLIRank profile:** https://clirank.dev/api/${data.clirankApiSlug}`);
+
+      lines.push("", `_Data freshness: ${data.freshness || "cached"}_`);
+
+      return textResult(lines.join("\n"));
+    } catch (err) {
+      return errorResult(err instanceof Error ? err.message : String(err));
+    }
+  }
+);
+
 // ---------- Helpers ----------
 
 function slugify(name: string): string {
@@ -586,7 +841,7 @@ async function startHttp() {
       res.end(JSON.stringify({
         serverInfo: {
           name: "clirank",
-          version: "0.2.0",
+          version: "0.4.0",
         },
         authentication: { required: false },
         tools: [
@@ -596,6 +851,8 @@ async function startHttp() {
           { name: "compare_apis", description: "Compare two or more APIs side by side", inputSchema: { type: "object", properties: { slugs: { type: "array", items: { type: "string" } } }, required: ["slugs"] } },
           { name: "browse_categories", description: "List all API categories", inputSchema: { type: "object", properties: {} } },
           { name: "get_reviews", description: "Get integration reports and reviews for an API", inputSchema: { type: "object", properties: { slug: { type: "string" }, limit: { type: "number" } }, required: ["slug"] } },
+          { name: "recommend", description: "Get an opinionated API recommendation with pricing and working quickstart code", inputSchema: { type: "object", properties: { task: { type: "string" }, volume: { type: "number" }, budget: { type: "number" }, priority: { type: "string", enum: ["cost", "simplicity", "deliverability", "scale"] }, constraints: { type: "array", items: { type: "string" } } }, required: ["task"] } },
+          { name: "get_package_info", description: "Get current npm/PyPI package version, compatibility, dependencies, and deprecation warnings", inputSchema: { type: "object", properties: { name: { type: "string" }, registry: { type: "string", enum: ["npm", "pypi"] } }, required: ["name"] } },
         ],
         resources: [],
         prompts: [],
