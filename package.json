@@ -1,7 +1,7 @@
 {
   "name": "clirank-mcp-server",
-  "version": "0.2.1",
-  "description": "CLIRank API directory as MCP tools for AI agents",
+  "version": "0.5.0",
+  "description": "CLIRank API decision engine - get opinionated API recommendations with pricing, setup data, and working quickstart code",
   "type": "module",
   "bin": {
     "clirank-mcp-server": "./dist/index.js"

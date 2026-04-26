@@ -4,8 +4,27 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
 import { createServer } from "node:http";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 // ---------- Config ----------
+const VERSION = "0.5.0";
 const BASE_URL = process.env.CLIRANK_API_URL || "https://clirank.dev/api";
+// ---------- First-run marker ----------
+const CONFIG_DIR = join(homedir(), ".clirank");
+const FIRST_RUN_MARKER = join(CONFIG_DIR, "installed");
+function isFirstRun() {
+    return !existsSync(FIRST_RUN_MARKER);
+}
+function markFirstRun() {
+    try {
+        mkdirSync(CONFIG_DIR, { recursive: true });
+        writeFileSync(FIRST_RUN_MARKER, new Date().toISOString());
+    }
+    catch {
+        // best-effort; non-fatal
+    }
+}
 // ---------- HTTP helpers ----------
 async function apiGet(path, params = {}) {
     const url = new URL(`${BASE_URL}${path}`);
@@ -14,7 +33,7 @@ async function apiGet(path, params = {}) {
             url.searchParams.set(k, v);
     }
     const res = await fetch(url.toString(), {
-        headers: { "User-Agent": "clirank-mcp/0.4.0" },
+        headers: { "User-Agent": `clirank-mcp/${VERSION}` },
     });
     if (!res.ok) {
         const body = await res.text().catch(() => "");
@@ -22,16 +41,46 @@ async function apiGet(path, params = {}) {
     }
     return res.json();
 }
+// ---------- Output helpers ----------
+/**
+ * Shown on first tool call after install. Asks the user to opt in to early-user
+ * status so we can talk to them about what's working. Then never shown again.
+ */
+const FIRST_RUN_BANNER = [
+    "",
+    "─────────────────────────────────────────────────────────",
+    "Hey - first time using CLIRank. Thanks for trying it.",
+    "",
+    "I'm Alex, I built this. It's early and I want feedback from",
+    "the first people using it. If that's you, drop a handle here",
+    "so I can talk to you directly:",
+    "",
+    "  https://clirank.dev/hello",
+    "",
+    "Or just email alex@clirank.dev / DM @alexclapp10 on X.",
+    "─────────────────────────────────────────────────────────",
+    "",
+].join("\n");
+const FEEDBACK_FOOTER = "\n\n—\nFeedback? alex@clirank.dev or @alexclapp10 on X.";
 function textResult(text) {
-    return { content: [{ type: "text", text }] };
+    let body = text;
+    if (isFirstRun()) {
+        body = FIRST_RUN_BANNER + body;
+        markFirstRun();
+    }
+    body += FEEDBACK_FOOTER;
+    return { content: [{ type: "text", text: body }] };
 }
 function errorResult(msg) {
-    return { content: [{ type: "text", text: `Error: ${msg}` }], isError: true };
+    return {
+        content: [{ type: "text", text: `Error: ${msg}${FEEDBACK_FOOTER}` }],
+        isError: true,
+    };
 }
 // ---------- MCP Server ----------
 const server = new McpServer({
     name: "clirank",
-    version: "0.4.0",
+    version: VERSION,
 });
 // Tool 1: discover_apis
 server.tool("discover_apis", "Search for APIs by what you need. Returns ranked matches with pricing and setup data when available. For an opinionated pick with working code, use the recommend tool instead. Examples: 'send transactional emails', 'process payments', 'image generation'.", {
@@ -570,7 +619,7 @@ async function startHttp() {
             res.end(JSON.stringify({
                 serverInfo: {
                     name: "clirank",
-                    version: "0.4.0",
+                    version: VERSION,
                 },
                 authentication: { required: false },
                 tools: [
