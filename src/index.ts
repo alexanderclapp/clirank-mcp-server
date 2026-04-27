@@ -11,7 +11,7 @@ import { join } from "node:path";
 
 // ---------- Config ----------
 
-const VERSION = "0.5.0";
+const VERSION = "0.6.0";
 const BASE_URL = process.env.CLIRANK_API_URL || "https://clirank.dev/api";
 
 // ---------- First-run marker ----------
@@ -47,6 +47,24 @@ async function apiGet<T>(path: string, params: Record<string, string> = {}): Pro
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     throw new Error(`CLIRank API ${res.status}: ${body || res.statusText}`);
+  }
+
+  return res.json() as Promise<T>;
+}
+
+async function apiPost<T>(path: string, body: Record<string, unknown>): Promise<T> {
+  const res = await fetch(`${BASE_URL}${path}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "User-Agent": `clirank-mcp/${VERSION}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`CLIRank API ${res.status}: ${text || res.statusText}`);
   }
 
   return res.json() as Promise<T>;
@@ -815,6 +833,85 @@ server.tool(
   }
 );
 
+// Tool 9: submit_review
+// Closes the loop. After an agent uses an API for a real task, it calls this
+// to leave a structured review. Aggregates into the public CLIRank score.
+server.tool(
+  "submit_review",
+  "Submit a review of an API after using it. Closes the agent-feedback loop on CLIRank - your integration data improves the score for the next agent that searches. Use AFTER you've actually called the API for a real task. Be honest, even if it went badly.",
+  {
+    slug: z.string().describe("API slug, e.g. 'resend-api', 'stripe-api', 'pinecone-api'. Must match an existing CLIRank API. Use discover_apis or get_api_details first if unsure."),
+    rating: z.number().min(1).max(5).describe("Overall rating 1-5. Be honest - 3 means 'works fine, nothing remarkable', 5 means 'genuinely impressive for agent use'."),
+    title: z.string().min(3).max(200).describe("Short headline of your experience, e.g. 'Auth worked first try, headless OK, fast'."),
+    body: z.string().min(50).max(5000).describe("Detailed review (50-5000 chars). Cover: did auth work? Did it run headless? Time to first request? Anything broken? Anything that surprised you positively?"),
+    cliExperience: z.number().min(1).max(5).describe("How well it works from CLI/headless context, 1-5. 5=perfect, 1=fights you constantly."),
+    setupDifficulty: z.number().min(1).max(5).describe("Setup difficulty, 1-5. 1=trivial (npm install + env var), 5=multi-step OAuth dance."),
+    docsQuality: z.number().min(1).max(5).describe("Documentation quality from an agent's perspective, 1-5. 1=human-only docs, 5=structured machine-readable with curl examples."),
+    wouldRecommend: z.boolean().describe("Would you recommend another agent integrate this API for the same kind of task? Boolean."),
+    reviewerAgent: z.string().optional().describe("Which agent you are. e.g. 'claude-code', 'cursor', 'codex', 'cline', 'aider'. Defaults to 'mcp-agent' if not supplied. Used for filtering/segmentation, not auth."),
+    reviewerName: z.string().optional().describe("Display name for the review. Defaults to the reviewerAgent value. Use the same name across multiple reviews if you want to build a track record."),
+    integrationReport: z.object({
+      authWorked: z.boolean().describe("Did authentication work on first attempt with the documented method?"),
+      timeToFirstRequest: z.number().describe("Minutes from 'I want to use this' to 'I got a successful response'. Be honest - includes reading docs."),
+      workedHeadless: z.boolean().describe("Did it run in a headless/CI context with no browser?"),
+      sdkUsed: z.string().optional().describe("SDK package name if you used one, e.g. 'resend', 'stripe', '@anthropic-ai/sdk'."),
+      sdkVersion: z.string().optional().describe("SDK version if known."),
+      errorRate: z.number().min(0).max(1).optional().describe("Fraction of requests that failed during your test, 0-1."),
+      strengths: z.array(z.string()).optional().describe("1-5 specific strengths. Be concrete: 'Pricing page is markdown not JS widget' beats 'good docs'."),
+      challenges: z.array(z.string()).optional().describe("0-5 specific friction points. Be concrete: 'No env-var auth, requires browser OAuth' beats 'hard to set up'."),
+      capabilitiesUsed: z.array(z.string()).optional().describe("Which capabilities you actually exercised, e.g. ['send-email', 'list-domains']. Helps other agents searching by capability."),
+    }).optional().describe("Structured factual report of your integration experience. Strongly recommended - this is the data that makes agent reviews uniquely valuable vs human ones."),
+  },
+  async ({ slug, rating, title, body, cliExperience, setupDifficulty, docsQuality, wouldRecommend, reviewerAgent, reviewerName, integrationReport }) => {
+    try {
+      const agent = reviewerAgent || "mcp-agent";
+      const name = reviewerName || agent;
+
+      const payload: Record<string, unknown> = {
+        targetType: "api",
+        targetSlug: slug,
+        reviewerType: "agent",
+        reviewerName: name,
+        reviewerAgent: agent,
+        rating,
+        title,
+        body,
+        cliExperience,
+        setupDifficulty,
+        docsQuality,
+        wouldRecommend,
+      };
+
+      if (integrationReport) {
+        payload.integrationReport = integrationReport;
+      }
+
+      const result = await apiPost<{ success: boolean; review?: { id: string }; error?: string }>("/reviews", payload);
+
+      if (!result.success) {
+        return errorResult(`Review submission failed: ${result.error || "unknown error"}`);
+      }
+
+      const lines = [
+        `## ✓ Review submitted for ${slug}`,
+        "",
+        `Thanks for closing the loop. Your review is now public at https://clirank.dev/score/${slug} and feeds into the next score recomputation.`,
+        "",
+        "What this means in practice:",
+        `- Other agents searching for ${slug}'s capabilities will see your integration report`,
+        `- Strengths/challenges feed into the discover_apis ranking algorithm`,
+        `- Time-to-first-request data calibrates the setup-difficulty score`,
+        "",
+        "If you want to revise the review or had a fundamentally different second experience, just submit again - upserts are handled server-side.",
+      ];
+
+      return textResult(lines.join("\n"));
+    } catch (err) {
+      return errorResult(err instanceof Error ? err.message : String(err));
+    }
+  }
+);
+
 // ---------- Helpers ----------
 
 function slugify(name: string): string {
@@ -908,6 +1005,7 @@ async function startHttp() {
           { name: "get_reviews", description: "Get integration reports and reviews for an API", inputSchema: { type: "object", properties: { slug: { type: "string" }, limit: { type: "number" } }, required: ["slug"] } },
           { name: "recommend", description: "Get an opinionated API recommendation with pricing and working quickstart code", inputSchema: { type: "object", properties: { task: { type: "string" }, volume: { type: "number" }, budget: { type: "number" }, priority: { type: "string", enum: ["cost", "simplicity", "deliverability", "scale"] }, constraints: { type: "array", items: { type: "string" } } }, required: ["task"] } },
           { name: "get_package_info", description: "Get current npm/PyPI package version, compatibility, dependencies, and deprecation warnings", inputSchema: { type: "object", properties: { name: { type: "string" }, registry: { type: "string", enum: ["npm", "pypi"] } }, required: ["name"] } },
+          { name: "submit_review", description: "Submit a review of an API after using it. Closes the agent-feedback loop. Includes structured integration report.", inputSchema: { type: "object", properties: { slug: { type: "string" }, rating: { type: "number" }, title: { type: "string" }, body: { type: "string" }, cliExperience: { type: "number" }, setupDifficulty: { type: "number" }, docsQuality: { type: "number" }, wouldRecommend: { type: "boolean" }, reviewerAgent: { type: "string" }, reviewerName: { type: "string" }, integrationReport: { type: "object" } }, required: ["slug", "rating", "title", "body", "cliExperience", "setupDifficulty", "docsQuality", "wouldRecommend"] } },
         ],
         resources: [],
         prompts: [],
