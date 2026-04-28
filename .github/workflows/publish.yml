@@ -30,11 +30,20 @@ jobs:
           node-version: "20"
           registry-url: "https://registry.npmjs.org"
 
+      - name: Update npm to latest (needed for OIDC trusted publisher)
+        run: npm install -g npm@latest
+
       - name: Install deps
         run: npm ci
 
       - name: Build
         run: npm run build
+
+      - name: Debug — show npm version and auth state
+        run: |
+          npm --version
+          npm whoami || echo "(not logged in, OIDC will handle auth)"
+          cat $NPM_CONFIG_USERCONFIG || true
 
       - name: Publish to npm
         # --provenance attaches a signed statement linking the package
