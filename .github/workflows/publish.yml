@@ -1,0 +1,43 @@
+name: Publish to npm
+
+# Triggers:
+#   - On any tag matching v* (e.g. v0.6.0, v1.0.0)
+#   - Manual via "Run workflow" button in the Actions tab
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    # OIDC requires id-token: write so npm can verify the publish
+    # came from this exact workflow + repo via GitHub's OIDC provider.
+    # Configured via npm Trusted Publisher (no token in env).
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Publish to npm
+        # --provenance attaches a signed statement linking the package
+        # to this exact workflow run. Required for Trusted Publisher.
+        # --access public for unscoped packages.
+        run: npm publish --access public --provenance
