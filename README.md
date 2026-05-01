@@ -1,34 +1,69 @@
 # clirank-mcp-server
 
-MCP server that exposes the CLIRank API directory as tools for AI agents. Search, compare, and get docs for 210+ APIs ranked by CLI relevance.
+MCP server that exposes the CLIRank API directory as tools for AI agents. Search, compare, and get docs for 416+ APIs ranked by agent-friendliness.
 
-Connects to the live CLIRank API at `https://clirank.dev/api` - no database or local data needed.
+Works with **Claude Code, Codex CLI, Cursor, Cline, Continue, Windsurf** - any MCP-compatible client. Connects to the live CLIRank API at `https://clirank.dev/api` - no database, no auth, no API key.
 
 ## Install
 
-Add to your Claude Code config (`~/.claude.json`):
+### Claude Code
+
+```bash
+claude mcp add clirank -- npx -y clirank-mcp-server@latest
+```
+
+Or add to `~/.claude.json` manually:
 
 ```json
 {
   "mcpServers": {
     "clirank": {
       "command": "npx",
-      "args": ["clirank-mcp-server"]
+      "args": ["-y", "clirank-mcp-server@latest"]
     }
   }
 }
 ```
 
-Or install globally:
+### Codex CLI
+
+One-liner:
+
+```bash
+codex mcp add clirank -- npx -y clirank-mcp-server@latest
+```
+
+Or add to `~/.codex/config.toml` manually:
+
+```toml
+[mcp_servers.clirank]
+command = "npx"
+args = ["-y", "clirank-mcp-server@latest"]
+```
+
+### Cursor
+
+Add to `~/.cursor/mcp.json` (or via Settings → MCP):
+
+```json
+{
+  "mcpServers": {
+    "clirank": {
+      "command": "npx",
+      "args": ["-y", "clirank-mcp-server@latest"]
+    }
+  }
+}
+```
+
+### Cline / Continue / Windsurf
+
+Same pattern - point your client's MCP config at `npx -y clirank-mcp-server@latest`.
+
+### Global install (any client)
 
 ```bash
 npm install -g clirank-mcp-server
-```
-
-Or with Claude Code CLI:
-
-```bash
-claude mcp add clirank -- npx clirank-mcp-server
 ```
 
 ## Tools

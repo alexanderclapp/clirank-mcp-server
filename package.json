@@ -1,6 +1,6 @@
 {
   "name": "clirank-mcp-server",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "CLIRank API decision engine - get opinionated API recommendations with pricing, setup data, and working quickstart code",
   "type": "module",
   "bin": {
