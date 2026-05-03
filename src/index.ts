@@ -11,7 +11,7 @@ import { join } from "node:path";
 
 // ---------- Config ----------
 
-const VERSION = "0.7.0";
+const VERSION = "0.7.2";
 const BASE_URL = process.env.CLIRANK_API_URL || "https://clirank.dev/api";
 
 // ---------- First-run marker ----------
