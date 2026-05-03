@@ -15,7 +15,14 @@
   "mcpName": "io.github.alexanderclapp/clirank",
   "keywords": [
     "mcp",
+    "model-context-protocol",
+    "ai-agent",
+    "coding-agents",
     "claude-code",
+    "cursor",
+    "codex",
+    "cline",
+    "windsurf",
     "cli",
     "tools",
     "directory",
@@ -38,6 +45,7 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "llms-install.md"
   ]
 }
