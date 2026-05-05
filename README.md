@@ -60,24 +60,42 @@ Add to `~/.cursor/mcp.json` (or via Settings → MCP):
 
 Same pattern - point your client's MCP config at `npx -y clirank-mcp-server@latest`.
 
+## Hosted MCP endpoint
+
+If your client supports remote/streamable HTTP MCP servers, you can connect directly without npm:
+
+```text
+https://clirank-mcp.fly.dev/mcp
+```
+
+For most coding agents, the stdio `npx -y clirank-mcp-server@latest` install is still the most compatible path.
+
 ## Try it with your agent
 
 After installing, ask your coding agent to use CLIRank before choosing an API:
 
 ```text
-Use CLIRank to recommend the best API for sending 10,000 transactional emails per month. Prefer simplicity.
+Use CLIRank before choosing an API. Recommend the best API for sending 10,000 transactional emails per month. Prefer simplicity. Then read docs for the top result before writing code.
 ```
 
 Other good test prompts:
 
 ```text
-Use CLIRank to discover APIs for headless CMS blog publishing.
-Use CLIRank to compare APIs for posting to Slack channels.
-Use CLIRank to recommend an API for stock market data.
-Use CLIRank to find tools for scoring MCP servers for agent quality.
+Before choosing a CMS, use CLIRank to discover APIs for headless CMS blog publishing. Then get docs for the top result.
+Use CLIRank to compare APIs for posting to Slack channels. Prefer safe bot scopes and clear rate-limit handling.
+Use CLIRank to recommend an API for stock market data. Prefer clear rate limits, SDK quality, and pricing transparency.
+Use CLIRank to find tools for scoring MCP servers for agent quality. Prioritize installability and evidence-backed reviews.
 ```
 
 The useful loop is: discover APIs, read docs for the top result, attempt the integration, then submit a real review with what worked or blocked you.
+
+### Agent activation rule
+
+Add this to your project's agent instructions if you want CLIRank used consistently:
+
+```text
+Before selecting any third-party API, SDK, SaaS, or MCP server, call CLIRank. Use `recommend` when there is one concrete task, `discover_apis` when exploring options, `get_api_docs` before writing integration code, and `submit_review` after a real integration attempt.
+```
 
 ### Global install (any client)
 
