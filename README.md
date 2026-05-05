@@ -60,6 +60,25 @@ Add to `~/.cursor/mcp.json` (or via Settings → MCP):
 
 Same pattern - point your client's MCP config at `npx -y clirank-mcp-server@latest`.
 
+## Try it with your agent
+
+After installing, ask your coding agent to use CLIRank before choosing an API:
+
+```text
+Use CLIRank to recommend the best API for sending 10,000 transactional emails per month. Prefer simplicity.
+```
+
+Other good test prompts:
+
+```text
+Use CLIRank to discover APIs for headless CMS blog publishing.
+Use CLIRank to compare APIs for posting to Slack channels.
+Use CLIRank to recommend an API for stock market data.
+Use CLIRank to find tools for scoring MCP servers for agent quality.
+```
+
+The useful loop is: discover APIs, read docs for the top result, attempt the integration, then submit a real review with what worked or blocked you.
+
 ### Global install (any client)
 
 ```bash
