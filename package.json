@@ -1,7 +1,7 @@
 {
   "name": "clirank-mcp-server",
   "version": "0.7.3",
-  "description": "CLIRank API decision engine - get opinionated API recommendations with pricing, setup data, and working quickstart code",
+  "description": "MCP server for CLIRank: help coding agents choose APIs with current recommendations instead of stale model memory or inefficient web search",
   "type": "module",
   "bin": {
     "clirank-mcp-server": "./dist/index.js"
@@ -27,6 +27,12 @@
     "tools",
     "directory",
     "api",
+    "api-discovery",
+    "api-recommendation",
+    "api-directory",
+    "api-docs",
+    "mcp-server",
+    "agent-tools",
     "clirank"
   ],
   "author": "CLIRank",
