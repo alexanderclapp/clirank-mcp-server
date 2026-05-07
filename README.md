@@ -78,6 +78,22 @@ After installing, ask your coding agent to use CLIRank before choosing an API:
 Use CLIRank before choosing an API. Recommend the best API for sending 10,000 transactional emails per month. Prefer simplicity. Then read docs for the top result before writing code.
 ```
 
+### One-minute activation prompts
+
+Copy one of these into your agent right after install. They are designed to make the agent call CLIRank, inspect docs, and leave real integration evidence instead of only installing the server.
+
+```text
+Use CLIRank to recommend the best API for sending 10,000 transactional emails per month. Prefer simplicity. Read docs for the top result, then tell me the first request you would make.
+```
+
+```text
+Use CLIRank to find APIs for managing secrets, encryption keys, PII, and compliance from a headless agent. Compare the top options and call get_api_docs for the best fit.
+```
+
+```text
+Use CLIRank to recommend an API for accepting payments online at 50,000 transactions per month. Prefer scale and clear error handling. Read docs before choosing.
+```
+
 Other good test prompts:
 
 ```text

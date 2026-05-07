@@ -59,9 +59,26 @@ After installing, call one of these tools:
 
 - `discover_apis` with query `send transactional emails`
 - `recommend` with use case `payments for a SaaS app`
+- `discover_apis` with query `secrets encryption PII compliance`
 - `browse_categories` with no arguments
 
 Expected result: the tool returns ranked API data from CLIRank without requiring credentials.
+
+## One-minute activation prompts
+
+Use one of these immediately after install to prove the server is active:
+
+```text
+Use CLIRank to recommend the best API for sending 10,000 transactional emails per month. Prefer simplicity. Read docs for the top result, then tell me the first request you would make.
+```
+
+```text
+Use CLIRank to find APIs for managing secrets, encryption keys, PII, and compliance from a headless agent. Compare the top options and call get_api_docs for the best fit.
+```
+
+```text
+Use CLIRank to recommend an API for accepting payments online at 50,000 transactions per month. Prefer scale and clear error handling. Read docs before choosing.
+```
 
 ## Copy/paste activation prompt
 
