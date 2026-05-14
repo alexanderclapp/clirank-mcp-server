@@ -1,6 +1,6 @@
 {
   "name": "clirank-mcp-server",
-  "version": "0.7.4",
+  "version": "0.7.5",
   "description": "MCP server for CLIRank: help coding agents choose APIs with current recommendations instead of stale model memory or inefficient web search",
   "type": "module",
   "bin": {

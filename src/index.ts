@@ -5,13 +5,13 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
 import { createServer } from "node:http";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
 // ---------- Config ----------
 
-const VERSION = "0.7.4";
+const VERSION = "0.7.5";
 const BASE_URL = process.env.CLIRANK_API_URL || "https://clirank.dev/api";
 
 // ---------- First-run marker ----------
@@ -1071,7 +1071,131 @@ async function startHttp() {
   });
 }
 
+// ---------- CLI setup ----------
+
+const CLAUDE_CODE_CONFIG = join(homedir(), ".claude", "settings.json");
+const CLAUDE_DESKTOP_CONFIG = join(
+  homedir(),
+  process.platform === "darwin"
+    ? "Library/Application Support/Claude/claude_desktop_config.json"
+    : process.platform === "win32"
+      ? "AppData/Roaming/Claude/claude_desktop_config.json"
+      : ".config/Claude/claude_desktop_config.json"
+);
+const CURSOR_CONFIG = join(homedir(), ".cursor", "mcp.json");
+
+const MCP_ENTRY = { command: "npx", args: ["-y", "clirank-mcp-server"] };
+
+const AGENT_CONFIGS: Record<string, { path: string; wrap: (entry: typeof MCP_ENTRY) => object }> = {
+  "claude-code": {
+    path: CLAUDE_CODE_CONFIG,
+    wrap: (e) => ({ mcpServers: { clirank: e } }),
+  },
+  "claude-desktop": {
+    path: CLAUDE_DESKTOP_CONFIG,
+    wrap: (e) => ({ mcpServers: { clirank: e } }),
+  },
+  cursor: {
+    path: CURSOR_CONFIG,
+    wrap: (e) => ({ mcpServers: { clirank: e } }),
+  },
+};
+
+function printSetupInstructions() {
+  const snippet = JSON.stringify({ clirank: MCP_ENTRY }, null, 2);
+
+  console.log(`
+  ┌────────────────────────────────────────────────────────────┐
+  │  CLIRank MCP Server v${VERSION}                                │
+  ├────────────────────────────────────────────────────────────┤
+  │                                                            │
+  │  To use this, add it to your agent's MCP config:           │
+  │                                                            │
+  │  Claude Code:    ~/.claude/settings.json                   │
+  │  Claude Desktop: ~/Library/.../claude_desktop_config.json  │
+  │  Cursor:         ~/.cursor/mcp.json                        │
+  │                                                            │
+  │  Add this to "mcpServers" in your config:                  │
+  │                                                            │`);
+  for (const l of snippet.split("\n")) {
+    const content = `    ${l}`;
+    console.log(`  │${content.padEnd(60)}│`);
+  }
+  console.log(`  │                                                            │
+  │  Or auto-setup:                                            │
+  │    npx clirank-mcp-server --setup claude-code              │
+  │    npx clirank-mcp-server --setup cursor                   │
+  │    npx clirank-mcp-server --setup claude-desktop           │
+  │                                                            │
+  └────────────────────────────────────────────────────────────┘
+`);
+}
+
+function runSetup(agent: string) {
+  const config = AGENT_CONFIGS[agent];
+  if (!config) {
+    console.error(`Unknown agent: "${agent}". Use one of: ${Object.keys(AGENT_CONFIGS).join(", ")}`);
+    process.exit(1);
+  }
+
+  let existing: Record<string, unknown> = {};
+  try {
+    if (existsSync(config.path)) {
+      existing = JSON.parse(readFileSync(config.path, "utf-8"));
+    }
+  } catch {
+    // file exists but isn't valid JSON - start fresh
+  }
+
+  const mcpServers = (existing.mcpServers as Record<string, unknown>) || {};
+  if (mcpServers.clirank) {
+    console.log(`✓ CLIRank is already configured in ${config.path}`);
+    console.log("  Remove the 'clirank' key from mcpServers if you want to reconfigure.");
+    process.exit(0);
+  }
+
+  mcpServers.clirank = MCP_ENTRY;
+  existing.mcpServers = mcpServers;
+
+  const dir = config.path.substring(0, config.path.lastIndexOf("/"));
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(config.path, JSON.stringify(existing, null, 2) + "\n");
+
+  console.log(`✓ Added CLIRank MCP server to ${config.path}`);
+  console.log();
+  console.log(`  Restart ${agent} to activate. Then ask your agent:`);
+  console.log(`  "What payment APIs are best for my project?"`);
+  console.log(`  "Compare Stripe vs Paddle for a SaaS billing flow"`);
+  console.log();
+}
+
 async function main() {
+  const args = process.argv.slice(2);
+
+  if (args.includes("--help") || args.includes("-h")) {
+    printSetupInstructions();
+    process.exit(0);
+  }
+
+  const setupIdx = args.indexOf("--setup");
+  if (setupIdx !== -1) {
+    const agent = args[setupIdx + 1];
+    if (!agent) {
+      console.error("Usage: npx clirank-mcp-server --setup <agent>");
+      console.error(`  Agents: ${Object.keys(AGENT_CONFIGS).join(", ")}`);
+      process.exit(1);
+    }
+    runSetup(agent);
+    process.exit(0);
+  }
+
+  // If a human ran this directly in a terminal, show setup help instead of
+  // silently starting a stdio server that does nothing useful for them.
+  if (process.stdin.isTTY && MODE !== "http") {
+    printSetupInstructions();
+    process.exit(0);
+  }
+
   if (MODE === "http") {
     await startHttp();
   } else {
