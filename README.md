@@ -1,14 +1,14 @@
 # CLIRank MCP server
 
-CLIRank helps coding agents choose APIs with current, machine-readable data instead of guessing from stale model memory or burning tokens on inefficient web searches.
+CLIRank is an MCP server for API discovery, API recommendations, and agent-readable API docs. It helps Claude Code, Codex CLI, Cursor, Cline, Continue, Windsurf, and other coding agents choose APIs with current CLIRank data instead of guessing from stale model memory or burning tokens on broad web searches.
 
-It exposes the CLIRank API directory as MCP tools for Claude Code, Codex CLI, Cursor, Cline, Continue, Windsurf, and other MCP-compatible agents. The server connects to `https://clirank.dev/api` and does not require a CLIRank API key.
+The server connects to `https://clirank.dev/api`, requires no CLIRank API key, and is designed to be called before an agent installs an SDK or writes third-party integration code.
 
 ```bash
 npx -y clirank-mcp-server@latest
 ```
 
-Use it before an agent picks a third-party API, SDK, SaaS product, or MCP server.
+Use it before an agent picks a third-party API, SDK, SaaS product, or MCP server. Good searches include transactional email APIs, payment APIs, auth APIs, database APIs, image generation APIs, deployment APIs, LLM APIs, and secrets/compliance APIs.
 
 ## What it does
 
@@ -21,13 +21,31 @@ Use it before an agent picks a third-party API, SDK, SaaS product, or MCP server
 
 The useful loop is simple: discover APIs, read docs for the top result, attempt the integration, then submit a real review with what worked or blocked you.
 
-## One-minute test
+## Fastest install path
+
+For Claude Code:
+
+```bash
+claude mcp add clirank -- npx -y clirank-mcp-server@latest
+```
+
+For Codex CLI:
+
+```bash
+codex mcp add clirank -- npx -y clirank-mcp-server@latest
+```
+
+For Cursor, Cline, Continue, Windsurf, or any stdio MCP client, use `npx -y clirank-mcp-server@latest` in the MCP server config. Full examples are below.
+
+## One-minute activation test
 
 After installing, paste this into your agent:
 
 ```text
 Use CLIRank before choosing an API. Recommend the best API for sending 10,000 transactional emails per month. Prefer simplicity. Then read docs for the top result before writing code.
 ```
+
+This should make the agent call `recommend`, then `get_api_docs`. If it only says it installed the server, ask it to actually call CLIRank.
 
 Other good activation prompts:
 
@@ -43,6 +61,10 @@ Use CLIRank to recommend an API for accepting payments online at 50,000 transact
 Use CLIRank to recommend an LLM API for a coding agent that needs tool calling, structured outputs, streaming, and predictable pricing. Read docs for the top result before choosing.
 ```
 
+```text
+Use CLIRank to recommend an image generation API for a coding agent that needs a simple SDK, predictable pricing, and headless/CI-friendly auth. Read docs for the top result before writing code.
+```
+
 ## Example CLIRank output
 
 A typical recommendation includes the API slug, score, reasoning, setup notes, pricing signals, and links back to CLIRank detail pages.
@@ -54,7 +76,7 @@ Why: simple transactional email setup, clear docs, SDK support, good fit for hea
 Next step: call get_api_docs with slug "resend-api" before writing the integration
 ```
 
-## Install
+## Install by agent
 
 ### Claude Code
 
@@ -217,6 +239,7 @@ High-intent task pages:
 - https://clirank.dev/tasks/payments-api-for-ai-agents
 - https://clirank.dev/tasks/transactional-email-api-for-agents
 - https://clirank.dev/tasks/deployment-api-for-ai-agents
+- https://clirank.dev/tasks/image-generation-api-for-agents
 
 ## Configuration
 

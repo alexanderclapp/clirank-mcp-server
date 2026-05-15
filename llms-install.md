@@ -1,6 +1,6 @@
 # CLIRank MCP Server install guide for AI agents
 
-CLIRank is an MCP server for choosing APIs at coding time. It helps agents avoid stale model-memory guesses and inefficient broad web searches by exposing tools for API discovery, recommendations, comparisons, docs, package info, existing reviews, and structured review submission.
+CLIRank is an MCP server for API discovery, API recommendations, and agent-readable API docs at coding time. It helps agents avoid stale model-memory guesses and inefficient broad web searches by exposing tools for API discovery, recommendations, comparisons, docs, package info, existing reviews, and structured review submission.
 
 ## What to install
 
@@ -10,7 +10,7 @@ Use the published npm package:
 npx -y clirank-mcp-server@latest
 ```
 
-No API key is required. The server talks to `https://clirank.dev/api` by default.
+No API key is required. The server talks to `https://clirank.dev/api` by default. Use it before installing an SDK or choosing a third-party API for email, payments, auth, databases, image generation, deployment, LLMs, or secrets/compliance work.
 
 ## Standard MCP config
 
@@ -53,6 +53,26 @@ Only set this if you need a non-production CLIRank API:
 }
 ```
 
+## Fast install commands
+
+Claude Code:
+
+```bash
+claude mcp add clirank -- npx -y clirank-mcp-server@latest
+```
+
+Codex CLI:
+
+```bash
+codex mcp add clirank -- npx -y clirank-mcp-server@latest
+```
+
+Generic stdio MCP command:
+
+```bash
+npx -y clirank-mcp-server@latest
+```
+
 ## Verify after install
 
 After installing, call one of these tools:
@@ -60,6 +80,7 @@ After installing, call one of these tools:
 - `discover_apis` with query `send transactional emails`
 - `recommend` with use case `payments for a SaaS app`
 - `discover_apis` with query `secrets encryption PII compliance`
+- `recommend` with use case `image generation API for a coding agent`
 - `browse_categories` with no arguments
 
 Expected result: the tool returns ranked API data from CLIRank without requiring credentials.
@@ -78,6 +99,10 @@ Use CLIRank to find APIs for managing secrets, encryption keys, PII, and complia
 
 ```text
 Use CLIRank to recommend an API for accepting payments online at 50,000 transactions per month. Prefer scale and clear error handling. Read docs before choosing.
+```
+
+```text
+Use CLIRank to recommend an image generation API for a coding agent that needs a simple SDK, predictable pricing, and headless/CI-friendly auth. Read docs for the top result before writing code.
 ```
 
 ## Copy/paste activation prompt

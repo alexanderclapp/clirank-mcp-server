@@ -1,7 +1,7 @@
 {
   "name": "clirank-mcp-server",
   "version": "0.7.5",
-  "description": "MCP server for CLIRank: help coding agents choose APIs with current recommendations instead of stale model memory or inefficient web search",
+  "description": "MCP server for API discovery and recommendations: help Claude Code, Codex, Cursor, Cline, and other coding agents choose APIs with current CLIRank data instead of stale model memory",
   "type": "module",
   "bin": {
     "clirank-mcp-server": "./dist/index.js"
@@ -15,24 +15,30 @@
   "mcpName": "io.github.alexanderclapp/clirank",
   "keywords": [
     "mcp",
+    "mcp-server",
     "model-context-protocol",
-    "ai-agent",
+    "api-discovery",
+    "api-recommendation",
+    "api-selection",
+    "api-ranking",
+    "api-directory",
+    "api-docs",
     "coding-agents",
+    "ai-agent",
+    "agent-tools",
+    "agentic-coding",
     "claude-code",
+    "claude-mcp",
     "cursor",
     "codex",
     "cline",
     "windsurf",
+    "continue",
+    "developer-tools",
+    "sdk",
+    "saas",
+    "npm",
     "cli",
-    "tools",
-    "directory",
-    "api",
-    "api-discovery",
-    "api-recommendation",
-    "api-directory",
-    "api-docs",
-    "mcp-server",
-    "agent-tools",
     "clirank"
   ],
   "author": "CLIRank",
@@ -53,5 +59,10 @@
     "dist",
     "README.md",
     "llms-install.md"
-  ]
+  ],
+  "homepage": "https://clirank.dev",
+  "bugs": {
+    "url": "https://clirank.dev/hello",
+    "email": "alex@clirank.dev"
+  }
 }
