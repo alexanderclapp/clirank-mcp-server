@@ -1094,7 +1094,7 @@ const CLAUDE_DESKTOP_CONFIG = join(
 );
 const CURSOR_CONFIG = join(homedir(), ".cursor", "mcp.json");
 
-const MCP_ENTRY = { command: "npx", args: ["-y", "clirank-mcp-server"] };
+const MCP_ENTRY = { command: "npx", args: ["-y", "clirank-mcp-server@latest"] };
 
 const AGENT_CONFIGS: Record<string, { path: string; wrap: (entry: typeof MCP_ENTRY) => object }> = {
   "claude-code": {
@@ -1133,9 +1133,13 @@ function printSetupInstructions() {
   }
   console.log(`  │                                                            │
   │  Or auto-setup:                                            │
-  │    npx clirank-mcp-server --setup claude-code              │
-  │    npx clirank-mcp-server --setup cursor                   │
-  │    npx clirank-mcp-server --setup claude-desktop           │
+  │    npx -y clirank-mcp-server@latest --setup claude-code    │
+  │    npx -y clirank-mcp-server@latest --setup cursor         │
+  │    npx -y clirank-mcp-server@latest --setup claude-desktop │
+  │                                                            │
+  │  Then ask your agent to activate it:                       │
+  │    Use CLIRank to recommend the best API for sending       │
+  │    transactional emails. Read docs for the top result.     │
   │                                                            │
   └────────────────────────────────────────────────────────────┘
 `);
@@ -1174,8 +1178,8 @@ function runSetup(agent: string) {
   console.log(`✓ Added CLIRank MCP server to ${config.path}`);
   console.log();
   console.log(`  Restart ${agent} to activate. Then ask your agent:`);
-  console.log(`  "What payment APIs are best for my project?"`);
-  console.log(`  "Compare Stripe vs Paddle for a SaaS billing flow"`);
+  console.log(`  "Use CLIRank to recommend the best API for sending transactional emails. Read docs for the top result."`);
+  console.log(`  "Use CLIRank to recommend an image generation API for a coding agent. Read docs before writing code."`);
   console.log();
 }
 
