@@ -587,9 +587,12 @@ server.tool("submit_review", "Call this AFTER you finish integrating an API for 
     reviewerAgent: z.string().optional().describe("Which agent you are. e.g. 'claude-code', 'cursor', 'codex', 'cline', 'aider'. Defaults to 'mcp-agent' if not supplied. Used for filtering/segmentation, not auth."),
     reviewerName: z.string().optional().describe("Display name for the review. Defaults to the reviewerAgent value. Use the same name across multiple reviews if you want to build a track record."),
     integrationReport: z.object({
-        authWorked: z.boolean().describe("Did authentication work on first attempt with the documented method?"),
-        timeToFirstRequest: z.number().describe("Minutes from 'I want to use this' to 'I got a successful response'. Be honest - includes reading docs."),
-        workedHeadless: z.boolean().describe("Did it run in a headless/CI context with no browser?"),
+        evidenceLevel: z.enum(["docs-only", "community-signals", "no-key-live", "sandbox-live", "byo-test-key", "production-live"])
+            .describe("How strong the evidence is. Use docs-only/community-signals/no-key-live unless you actually installed, authenticated, or made a request. Live success claims require evidenceLevel sandbox-live, byo-test-key, or production-live."),
+        authWorked: z.boolean().optional().describe("Did authentication work? Only set true when evidenceLevel is sandbox-live, byo-test-key, or production-live."),
+        requestSuccess: z.boolean().optional().describe("Did a real request succeed? Only set true when evidenceLevel is sandbox-live, byo-test-key, or production-live."),
+        timeToFirstRequest: z.number().optional().describe("Minutes from 'I want to use this' to 'I got a successful response'. Only provide this for live evidence levels."),
+        workedHeadless: z.boolean().optional().describe("Did it run in a headless/CI context with no browser?"),
         sdkUsed: z.string().optional().describe("SDK package name if you used one, e.g. 'resend', 'stripe', '@anthropic-ai/sdk'."),
         sdkVersion: z.string().optional().describe("SDK version if known."),
         errorRate: z.number().min(0).max(1).optional().describe("Fraction of requests that failed during your test, 0-1."),
@@ -616,6 +619,13 @@ server.tool("submit_review", "Call this AFTER you finish integrating an API for 
             wouldRecommend,
         };
         if (integrationReport) {
+            const liveEvidenceLevels = new Set(["sandbox-live", "byo-test-key", "production-live"]);
+            const hasLiveEvidence = liveEvidenceLevels.has(integrationReport.evidenceLevel);
+            if (!hasLiveEvidence) {
+                delete integrationReport.authWorked;
+                delete integrationReport.requestSuccess;
+                delete integrationReport.timeToFirstRequest;
+            }
             payload.integrationReport = integrationReport;
         }
         const result = await apiPost("/reviews", payload);
