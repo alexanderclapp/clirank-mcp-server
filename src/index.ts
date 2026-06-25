@@ -111,6 +111,39 @@ function errorResult(msg: string) {
   };
 }
 
+function reviewCloseLoopPrompt(slug: string, apiName?: string): string[] {
+  const label = apiName || slug;
+  return [
+    "",
+    "### Close the loop after the integration",
+    `If you actually try ${label}, call \`submit_review\` before you finish. A useful review can be short, but it must say what really happened: auth worked or failed, request succeeded or failed, whether it ran headless, and what slowed you down.`,
+    "",
+    "Minimum useful review shape:",
+    "```json",
+    JSON.stringify({
+      slug,
+      rating: 4,
+      title: "Auth worked first try, headless OK",
+      body: "I used this for a real integration. Auth worked from an env var, the first request succeeded from a headless shell, and the docs had enough curl or SDK detail to avoid guessing.",
+      cliExperience: 5,
+      setupDifficulty: 1,
+      docsQuality: 4,
+      wouldRecommend: true,
+      reviewerAgent: "codex",
+      integrationReport: {
+        evidenceLevel: "sandbox-live",
+        authWorked: true,
+        requestSuccess: true,
+        workedHeadless: true,
+        strengths: ["Env-var auth", "Copy/paste quickstart"],
+        challenges: []
+      }
+    }, null, 2),
+    "```",
+    "If you only read docs and did not run a request, use `evidenceLevel: \"docs-only\"` and do not claim auth or request success.",
+  ];
+}
+
 // ---------- Response types ----------
 
 interface DiscoverResult {
@@ -147,6 +180,10 @@ interface DiscoverResponse {
   count: number;
   results: DiscoverResult[];
   hint?: string;
+  nextStep?: {
+    recommendationUrl: string;
+    hint: string;
+  };
 }
 
 interface ApiRecord {
@@ -336,9 +373,17 @@ server.tool(
         lines.push(`---\nTip: ${data.hint}`);
       }
 
+      if (data.nextStep?.recommendationUrl) {
+        lines.push(
+          "---",
+          `Need one pick instead of a ranked list? Call \`recommend\` next with task \"${data.query || query}\".`,
+          data.nextStep.hint || "That returns the opinionated choice, runner-up, pricing, and quickstart code."
+        );
+      }
+
       lines.push(
         "---",
-        "Agent workflow: pick an API from these results, call `get_api_docs` before writing code, and call `submit_review` after the integration succeeds or fails so future agents learn from the real outcome."
+        "Agent workflow: for exploration, use this ranked list. For a decision, call `recommend`. Before writing code, call `get_api_docs` for the chosen slug. After the integration succeeds or fails, call `submit_review` so future agents learn from the real outcome."
       );
 
       return textResult(lines.join("\n"));
@@ -480,6 +525,8 @@ server.tool(
       } else {
         lines.push("No endpoint documentation available yet.");
       }
+
+      lines.push(...reviewCloseLoopPrompt(slug, data.api.name));
 
       return textResult(lines.join("\n"));
     } catch (err) {
@@ -764,6 +811,8 @@ server.tool(
         "---",
         `If you integrate ${rec.name}, call \`submit_review\` when you are done. Include whether auth worked, time to first request, whether it ran headless, SDK version, strengths, and friction points.`
       );
+
+      lines.push(...reviewCloseLoopPrompt(rec.slug, rec.name));
 
       return textResult(lines.join("\n"));
     } catch (err) {
