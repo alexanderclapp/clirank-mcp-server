@@ -12,7 +12,7 @@ Use it before an agent picks a third-party API, SDK, SaaS product, or MCP server
 
 ## What it does
 
-- Search 416+ APIs by task or intent.
+- Search 420+ APIs by task or intent.
 - Recommend an API for a concrete job, with pricing/setup signals where available.
 - Fetch agent-friendly docs before writing integration code.
 - Compare APIs side by side.
@@ -46,6 +46,21 @@ Use CLIRank before choosing an API. Recommend the best API for sending 10,000 tr
 ```
 
 This should make the agent call `recommend`, then `get_api_docs`. If it only says it installed the server, ask it to actually call CLIRank.
+
+If you can call tools directly, use this as the first smoke test:
+
+```json
+{
+  "tool": "recommend",
+  "arguments": {
+    "task": "send transactional email from Next.js with webhooks and SDK",
+    "volume": 10000,
+    "priority": "simplicity"
+  }
+}
+```
+
+Then call `get_api_docs` for the returned slug. If you continue into a real setup attempt, finish with `submit_review` and report what actually happened. Docs-only is fine. Fake live success is not.
 
 Other good activation prompts:
 

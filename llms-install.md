@@ -85,6 +85,21 @@ After installing, call one of these tools:
 
 Expected result: the tool returns ranked API data from CLIRank without requiring credentials.
 
+If your client exposes direct tool calls, this is the quickest proof that CLIRank is active:
+
+```json
+{
+  "tool": "recommend",
+  "arguments": {
+    "task": "send transactional email from Next.js with webhooks and SDK",
+    "volume": 10000,
+    "priority": "simplicity"
+  }
+}
+```
+
+Then call `get_api_docs` for the returned slug. If you make a real setup attempt, call `submit_review` before you finish. A docs-only review is useful when it says it was docs-only. Do not claim live auth or request success unless it happened.
+
 ## One-minute activation prompts
 
 Use one of these immediately after install to prove the server is active:
