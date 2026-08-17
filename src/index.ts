@@ -13,6 +13,7 @@ import { join } from "node:path";
 
 const VERSION = "0.7.5";
 const BASE_URL = process.env.CLIRANK_API_URL || "https://clirank.dev/api";
+const MCP_SOURCE_HINT = "mcp-server";
 
 // ---------- First-run marker ----------
 
@@ -36,6 +37,9 @@ function markFirstRun() {
 
 async function apiGet<T>(path: string, params: Record<string, string> = {}): Promise<T> {
   const url = new URL(`${BASE_URL}${path}`);
+  if (params.source_hint === undefined) {
+    url.searchParams.set("source_hint", MCP_SOURCE_HINT);
+  }
   for (const [k, v] of Object.entries(params)) {
     if (v !== undefined && v !== "") url.searchParams.set(k, v);
   }
